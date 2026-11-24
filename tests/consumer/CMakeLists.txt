@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.21)
+project(dock_consumer LANGUAGES CXX)
+find_package(fltk-dock 0.1 CONFIG REQUIRED)
+add_executable(consumer main.cpp)
+target_link_libraries(consumer PRIVATE fltk-dock::fltk-dock)
+enable_testing()
+add_test(NAME installed-dock COMMAND consumer)
