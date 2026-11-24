@@ -129,6 +129,7 @@ class Host : public Fl_Group
     std::vector<Splitter> splitters_;
     std::vector<TabGroup> groups_;
     Panel *resizing_ = nullptr;
+    bool splitter_hover_ = false;
     int resize_origin_ = 0, resize_extent_ = 0;
     struct DropTarget
     {

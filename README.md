@@ -1,6 +1,6 @@
 # fltk-dock
 
-Dockable tool windows for FLTK 1.4.5, written in C++17. No Qt dependency.
+Dockable tool windows for FLTK 1.4.5, written in C++17.
 
 Panels can dock to any of the four host edges, float in independent native
 windows, share an area with tabs, resize through splitters, and hide/reopen.

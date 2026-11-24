@@ -46,7 +46,7 @@ Panel::Panel(Host &host, std::string id, const char *title, Fl_Widget &content, 
     end();
     Fl_Group::add(content);
     box(FL_FLAT_BOX);
-    color(FL_WHITE);
+    color(FL_BACKGROUND_COLOR);
 }
 
 Panel::~Panel()
@@ -71,12 +71,12 @@ void Panel::resize(int x, int y, int w, int h)
 void Panel::draw()
 {
     draw_box();
-    fl_color(fl_rgb_color(225, 230, 235));
+    fl_color(color());
     fl_rectf(x(), y(), w(), title_height);
-    fl_color(fl_rgb_color(175, 185, 195));
+    fl_color(fl_color_average(color(), labelcolor(), 0.7f));
     fl_rect(x(), y(), w(), h());
-    fl_color(fl_rgb_color(35, 40, 45));
-    fl_font(FL_HELVETICA, 13);
+    fl_color(labelcolor());
+    fl_font(labelfont(), labelsize());
     fl_push_clip(x() + 8, y(), std::max(0, w() - 62), title_height);
     fl_draw(label() ? label() : "", x() + 8, y(), w() - 64, title_height, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
     fl_pop_clip();
@@ -94,7 +94,7 @@ void Panel::menu()
 {
     Fl_Menu_Item items[] = {{"Dock left"}, {"Dock right"}, {"Dock top"}, {"Dock bottom"},
                             {"Float"},     {"Hide"},       {nullptr}};
-    const auto *chosen = items->popup(Fl::event_x_root(), Fl::event_y_root());
+    const auto *chosen = items->popup(Fl::event_x(), Fl::event_y());
     if (!chosen)
         return;
     const auto action = chosen - items;
@@ -540,11 +540,11 @@ void guide(int cx, int cy, int direction, bool selected, double opacity, Fl_Colo
 {
     const auto blend = [&](Fl_Color color)
     { return fl_color_average(color, background, static_cast<float>(opacity)); };
-    fl_color(blend(selected ? fl_rgb_color(0, 120, 215) : fl_rgb_color(238, 247, 255)));
+    fl_color(blend(selected ? FL_SELECTION_COLOR : fl_color_average(FL_SELECTION_COLOR, background, 0.1f)));
     fl_rectf(cx - guide_size / 2, cy - guide_size / 2, guide_size, guide_size);
-    fl_color(blend(fl_rgb_color(0, 95, 175)));
+    fl_color(blend(FL_SELECTION_COLOR));
     fl_rect(cx - guide_size / 2, cy - guide_size / 2, guide_size, guide_size);
-    fl_color(blend(selected ? FL_WHITE : fl_rgb_color(0, 95, 175)));
+    fl_color(blend(selected ? fl_contrast(FL_WHITE, FL_SELECTION_COLOR) : FL_SELECTION_COLOR));
     if (direction == 4)
     {
         fl_rect(cx - 8, cy - 6, 16, 12);
@@ -801,7 +801,7 @@ void Host::draw()
                   py = static_cast<int>(std::lround(rectangle[1]));
         const int pw = static_cast<int>(std::lround(rectangle[2])),
                   ph = static_cast<int>(std::lround(rectangle[3]));
-        fl_color(fl_color_average(fl_rgb_color(0, 120, 215), color(), static_cast<float>(opacity)));
+        fl_color(fl_color_average(FL_SELECTION_COLOR, color(), static_cast<float>(opacity)));
         fl_line_style(FL_SOLID, 3);
         fl_rect(px + 2, py + 2, std::max(1, pw - 4), std::max(1, ph - 4));
         fl_line_style(0);
@@ -876,13 +876,22 @@ int Host::handle(int event)
     }
     if (event == FL_MOVE || event == FL_LEAVE)
     {
-        Fl_Cursor cursor = FL_CURSOR_DEFAULT;
         for (const auto &splitter : splitters_)
-            if (event != FL_LEAVE && Fl::event_x() >= splitter.x && Fl::event_x() < splitter.x + splitter.w &&
+            if (event == FL_MOVE && Fl::event_x() >= splitter.x && Fl::event_x() < splitter.x + splitter.w &&
                 Fl::event_y() >= splitter.y && Fl::event_y() < splitter.y + splitter.h)
-                cursor = horizontal(splitter.panel->side()) ? FL_CURSOR_WE : FL_CURSOR_NS;
-        if (window())
-            window()->cursor(cursor);
+            {
+                splitter_hover_ = true;
+                if (window())
+                    window()->cursor(horizontal(splitter.panel->side()) ? FL_CURSOR_WE : FL_CURSOR_NS);
+                return 1;
+            }
+        // Reset only a cursor set by this Host. Child widgets own their own hover cursor.
+        if (splitter_hover_)
+        {
+            splitter_hover_ = false;
+            if (window())
+                window()->cursor(FL_CURSOR_DEFAULT);
+        }
     }
     return Fl_Group::handle(event);
 }

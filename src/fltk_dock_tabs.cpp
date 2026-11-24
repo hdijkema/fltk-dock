@@ -9,8 +9,8 @@ namespace fltk_dock
 Tabs::Tabs(int x, int y, int w, int h, const char *label) : Fl_Tabs(x, y, w, h, label)
 {
     box(FL_FLAT_BOX);
-    color(fl_rgb_color(240, 240, 240));
-    selection_color(FL_WHITE);
+    color(FL_BACKGROUND_COLOR);
+    selection_color(FL_BACKGROUND2_COLOR);
     labelsize(14);
     handle_overflow(OVERFLOW_PULLDOWN);
 }
@@ -85,21 +85,21 @@ void Tabs::draw_tab(int x1, int, int width, int height, Fl_Widget *page, int fla
     const bool selected = page == value();
     const int top = height >= 0 ? y() : y() + h() + height;
     height = std::abs(height);
-    const Fl_Color background = selected ? FL_WHITE : fl_rgb_color(235, 235, 235);
+    const Fl_Color background = selected ? selection_color() : color();
     fl_color(background);
     fl_rectf(x1, top + 1, width, height);
-    fl_color(fl_rgb_color(180, 180, 180));
+    fl_color(fl_color_average(color(), labelcolor(), 0.7f));
     fl_rect(x1, top + 1, width, height);
     if (selected)
     {
-        fl_color(fl_rgb_color(0, 120, 215));
+        fl_color(FL_SELECTION_COLOR);
         fl_rectf(x1 + 1, top + 1, width - 2, 2);
         fl_color(background);
         fl_line(x1 + 1, top + height, x1 + width - 2, top + height);
     }
     const bool close = (page->when() & FL_WHEN_CLOSED) && !(flags & 1);
     fl_font(page->labelfont(), page->labelsize());
-    fl_color(fl_rgb_color(30, 30, 30));
+    fl_color(labelcolor());
     fl_push_clip(x1 + 8, top + 3, std::max(0, width - (close ? 29 : 16)), height - 5);
     fl_draw(page->label() ? page->label() : "", x1 + 8, top + 2, std::max(0, width - (close ? 29 : 16)),
             height - 3, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
