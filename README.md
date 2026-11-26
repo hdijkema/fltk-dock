@@ -1,5 +1,10 @@
 # fltk-dock
 
+<img src="docs/assets/logo.svg" width="80" height="80" alt="fltk-dock logo">
+
+[Homepage](https://hdijkema.github.io/fltk-dock/) |
+[API reference and usage examples](docs/API.md)
+
 Dockable tool windows for FLTK 1.4.5, written in C++17.
 
 Panels can dock to any of the four host edges, float in independent native

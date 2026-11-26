@@ -43,3 +43,35 @@ FLTK timer repaints only while the guides or outline are changing; it does not
 run continuously or delay hit testing/release. Moving to another target restarts
 from the currently displayed rectangle. Hiding or destroying the Host and
 finishing a drag remove the pending callback. No GUI thread sleeps are used.
+
+## API documentation
+
+`docs/API.md` documents this repository's public headers, ownership rules and
+CMake integration, with a complete C++ example. Update it when the public API
+changes. The Penthario website links here rather than maintaining a second copy.
+
+## Library website
+
+`docs/index.html` is the standalone landing page. `docs/assets/logo.svg` is the
+library's vector logo and favicon; `docs/style.css` provides responsive layout
+and system light/dark themes. All assets and fonts are local or system-provided;
+there is no JavaScript, tracking or build dependency in the library itself.
+
+GitHub Pages can publish the default branch's `/docs` directory. Jekyll uses
+`docs/_config.yml`, `jekyll-optional-front-matter` and the documentation layout
+to render `API.md` and this guide as HTML. Repository-relative source links in
+the Markdown are mapped to GitHub by the layout. Documentation stays owned by
+this repository. The landing illustration is an HTML/CSS diagram, not a product
+screenshot. The logo uses the same rounded-square geometry as the other widget
+libraries, with a distinct symbol and accent color.
+
+To build locally with Jekyll 3.10 and `kramdown-parser-gfm` installed:
+
+```sh
+jekyll build --source docs --destination build/site/fltk-dock
+python -m http.server 8000 --directory build/site
+```
+
+Open `http://localhost:8000/fltk-dock/`. The destination includes the configured
+repository base path so API-page assets resolve correctly. Publishing requires the repository's GitHub Pages setting;
+adding these source files does not change that setting or publish the site.
