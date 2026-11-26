@@ -6,121 +6,28 @@ The library owns dockable tool panels around one central widget. Panels can
 share tabs, float in native windows and hide without losing their content.
 Namespace: `fltk_dock`. All operations require the FLTK GUI thread.
 
-## Headers and linking
+## How the API works
 
-`<fltk_dock.h>` declares the host, panels and snapshots, and includes
-`<fltk_dock_tabs.h>`. Include the latter directly for standalone document tabs.
+Construct a `Host` inside a window, give it a central document widget, and
+register the surrounding tool panels. The same content widgets move between
+docked areas, tabs and floating windows.
 
-```cmake
-cmake_minimum_required(VERSION 3.21)
-project(dock-example LANGUAGES CXX)
-find_package(fltk-dock 0.1 CONFIG REQUIRED)
-add_executable(example main.cpp)
-target_compile_features(example PRIVATE cxx_std_17)
-target_link_libraries(example PRIVATE fltk-dock::fltk-dock)
-```
-
-## Side and PanelState
-
-Declared in [fltk_dock.h](../include/fltk_dock.h).
-
-`enum class Side { Left, Right, Top, Bottom };` identifies an edge.
-`PanelState` is an application-owned value with these public fields:
-
-| Field | Default | Meaning |
-| --- | --- | --- |
-| `std::string id` | empty | Stable registered panel ID. |
-| `Side side` | `Side::Left` | Dock edge, also remembered when floating. |
-| `int extent` | `240` | Width of a left/right strip or height of a top/bottom strip. |
-| `bool open` | `true` | Whether the panel is open. |
-| `bool floating` | `false` | Whether it occupies a floating window. |
-| `int x`, `int y` | `100`, `100` | Floating window screen coordinates. |
-| `int w`, `int h` | `400`, `400` | Floating window dimensions. |
-| `std::string tab_group` | empty | Shared docking tab group identifier, if any. |
-| `bool active` | `false` | Active panel within a tab group. |
-
-Keep the vector order returned by `save_layout()`: it also records strip
-placement order. Store all fields when serializing a snapshot.
-
-## Host
-
-`Host` derives from `Fl_Group`. Its public API is:
-
-| Declaration | Preconditions and result |
+| Class | Construction, use and behavior |
 | --- | --- |
-| `Host(int x, int y, int w, int h)` | Create a host group. |
-| `~Host() override` | Destroy owned panels, floating windows and content. Hide the owning window before destruction. |
-| `void center(Fl_Widget& content)` | Adopt one heap widget as the center; set it once before panel interaction. Replacing an existing center throws `std::invalid_argument`. |
-| `Panel& add_panel(std::string id, const char* title, Fl_Widget& content, Side side, int extent = 240)` | Adopt a heap content widget and return its host-owned frame. IDs must be nonempty and unique, content unique, side valid and extent 80–4096; invalid registration throws `std::invalid_argument`. |
-| `void dock(Panel& panel, Side side)` | Dock a panel owned by this host at the supplied edge. |
-| `void dock_beside(Panel& panel, Panel& target, Side position)` | Insert beside a visible strip in the same host. Left/right strips accept Left/Right; top/bottom strips accept Top/Bottom. Target tab groups remain together. |
-| `void tabify(Panel& panel, Panel& target)` | Place the panel in the target's tabbed docking area. Both panels must belong to this host. |
-| `void float_panel(Panel& panel, int screen_x, int screen_y)` | Float an owned panel without rebuilding content. |
-| `void open(Panel& panel, bool open = true)` | Reopen or hide a registered panel, retaining its placement and content. |
-| `std::vector<PanelState> save_layout() const` | Return an application-owned snapshot of registered panels. No files are written. |
-| `void restore_layout(const std::vector<PanelState>& states)` | Register panels first. Validate the full snapshot before changing the layout, match IDs, ignore unknown IDs and clamp floating geometry to a screen. Invalid snapshots throw `std::invalid_argument`. |
-| `void resize(int x, int y, int w, int h) override` | Resize and relayout the host. |
-| `void layout()` | Lay out ordered edge strips, tabs and splitters, then give the remaining rectangle to the center widget. |
-| `int handle(int event) override` | Handle splitter, docking and preview interaction through the FLTK event loop. |
-| `void draw() override` (protected) | Paint the host and docking feedback. |
+| `Host` | Construct with normal FLTK geometry. Call `center()` once and `add_panel()` for each stable panel ID. Both operations adopt heap widgets. `dock()`, `dock_beside()`, `tabify()` and `float_panel()` change placement; `open()` hides or reopens content. |
+| `Panel` | Obtain the host-owned reference returned by `add_panel()`. `id()`, `is_open()`, `is_floating()`, `side()` and `content()` inspect it. Drag its title or tab to move it; the host controls its lifetime. |
+| `Tabs` | Construct as an ordinary `Fl_Tabs` replacement and add FLTK child pages. It keeps native selection and keyboard behavior with a fixed-height rectangular strip. Docking-panel pages can be dragged out; ordinary pages remain documents. |
 
-Operations taking panels reject ownership mismatches. Invalid docking directions
-or incompatible relative placement also throw `std::invalid_argument`.
-Layout persistence is separate from content persistence: save editor text and
-application data yourself.
-
-Snapshot validation requires nonempty, unique IDs, a valid side, extent 80–4096,
-width/height 1–32768, a tab-group name of at most 256 bytes, and x/y coordinates
-within ±1,000,000. Unknown panel IDs are ignored only after the whole input has
-passed validation. Panels absent from the snapshot retain their state.
-
-## Panel
-
-`Panel` derives from `Fl_Group`. Construction is private; use `Host::add_panel`.
-The host owns each frame. Do not delete a panel or its registered content yourself.
-
-| Declaration | Result |
-| --- | --- |
-| `~Panel() override` | Release the frame's owned resources; destruction normally belongs to the host. |
-| `const std::string& id() const` | Borrow the stable ID. |
-| `bool is_open() const` | Return the saved open state. |
-| `bool is_floating() const` | Return floating placement state. |
-| `Side side() const` | Return the remembered dock edge. |
-| `Fl_Widget& content() const` | Borrow the owned content widget, including from a const panel. |
-| `void resize(int x, int y, int w, int h) override` | Resize the frame and its content. |
-| `int handle(int event) override` | Dispatch title drag, double-click and context-menu interaction. |
-| `void draw() override` (protected) | Paint the panel frame and title. |
-
-Drag a panel title or dock tab toward the host's arrow guides. The center guide
-creates a tab group. Releasing away from a guide floats the panel. The close
-control hides it; reopen with `host.open(panel)`. Double-click the inner title
-to toggle floating/docked placement. The native window caption moves a floating
-window normally.
-
-## Tabs
-
-Declared in [fltk_dock_tabs.h](../include/fltk_dock_tabs.h).
-`Tabs` derives from `Fl_Tabs` and retains native selection, keyboard navigation,
-child ownership and overflow behavior.
-
-| Declaration | Result |
-| --- | --- |
-| `Tabs(int x, int y, int w, int h, const char* label = nullptr)` | Create rectangular document or docking tabs. |
-| `void resize(int x, int y, int w, int h) override` | Keep a 30-pixel strip and fit constructed pages to the client area. |
-| `int handle(int event) override` | Permit docking-panel tab drags; ordinary pages use native FLTK handling. |
-| `void draw_tab(int, int, int, int, Fl_Widget*, int, int) override` (protected) | Paint a tab and its optional close glyph. |
-| `int hit_close(Fl_Widget*, int, int) override` (protected) | Test the same close-glyph geometry used for drawing. |
-| `int tab_positions() override` (protected) | Calculate tab placement for the custom strip. |
-
-For an ordinary page, enable a close request with
-`page->when(FL_WHEN_CLOSED)` and `page->callback(...)`. The callback decides
-whether to save, cancel or remove the page; the library does not make that
-decision for the application.
+Save the workspace with `save_layout()` and restore it after registering panels
+with `restore_layout()`. Your application stores the returned snapshot. Use the
+GUI thread throughout, retain borrowed panel references only while their host
+lives, and hide the owning window before destroying it.
 
 ## Complete example: two tabbed tool panels
 
-Save as `main.cpp`. The window owns the host; the host adopts the center and
-panel content. A saved snapshot is restored after a temporary placement change.
+Save as `main.cpp`; see [Headers and linking](#headers-and-linking) for CMake
+integration. The window owns the host; the host adopts the center and panel
+content. A saved snapshot is restored after a temporary placement change.
 
 ```cpp
 #include <FL/Fl.H>
@@ -154,6 +61,83 @@ int main()
 }
 ```
 
+## Class API
+
+### Host
+
+`Host` derives from `Fl_Group`. Its public API is:
+
+| Declaration | Preconditions and result |
+| --- | --- |
+| `Host(int x, int y, int w, int h)` | Create a host group. |
+| `~Host() override` | Destroy owned panels, floating windows and content. Hide the owning window before destruction. |
+| `void center(Fl_Widget& content)` | Adopt one heap widget as the center; set it once before panel interaction. Replacing an existing center throws `std::invalid_argument`. |
+| `Panel& add_panel(std::string id, const char* title, Fl_Widget& content, Side side, int extent = 240)` | Adopt a heap content widget and return its host-owned frame. IDs must be nonempty and unique, content unique, side valid and extent 80–4096; invalid registration throws `std::invalid_argument`. |
+| `void dock(Panel& panel, Side side)` | Dock a panel owned by this host at the supplied edge. |
+| `void dock_beside(Panel& panel, Panel& target, Side position)` | Insert beside a visible strip in the same host. Left/right strips accept Left/Right; top/bottom strips accept Top/Bottom. Target tab groups remain together. |
+| `void tabify(Panel& panel, Panel& target)` | Place the panel in the target's tabbed docking area. Both panels must belong to this host. |
+| `void float_panel(Panel& panel, int screen_x, int screen_y)` | Float an owned panel without rebuilding content. |
+| `void open(Panel& panel, bool open = true)` | Reopen or hide a registered panel, retaining its placement and content. |
+| `std::vector<PanelState> save_layout() const` | Return an application-owned snapshot of registered panels. No files are written. |
+| `void restore_layout(const std::vector<PanelState>& states)` | Register panels first. Validate the full snapshot before changing the layout, match IDs, ignore unknown IDs and clamp floating geometry to a screen. Invalid snapshots throw `std::invalid_argument`. |
+| `void resize(int x, int y, int w, int h) override` | Resize and relayout the host. |
+| `void layout()` | Lay out ordered edge strips, tabs and splitters, then give the remaining rectangle to the center widget. |
+| `int handle(int event) override` | Handle splitter, docking and preview interaction through the FLTK event loop. |
+| `void draw() override` (protected) | Paint the host and docking feedback. |
+
+Operations taking panels reject ownership mismatches. Invalid docking directions
+or incompatible relative placement also throw `std::invalid_argument`.
+Layout persistence is separate from content persistence: save editor text and
+application data yourself.
+
+Snapshot validation requires nonempty, unique IDs, a valid side, extent 80–4096,
+width/height 1–32768, a tab-group name of at most 256 bytes, and x/y coordinates
+within ±1,000,000. Unknown panel IDs are ignored only after the whole input has
+passed validation. Panels absent from the snapshot retain their state.
+
+### Panel
+
+`Panel` derives from `Fl_Group`. Construction is private; use `Host::add_panel`.
+The host owns each frame. Do not delete a panel or its registered content yourself.
+
+| Declaration | Result |
+| --- | --- |
+| `~Panel() override` | Release the frame's owned resources; destruction normally belongs to the host. |
+| `const std::string& id() const` | Borrow the stable ID. |
+| `bool is_open() const` | Return the saved open state. |
+| `bool is_floating() const` | Return floating placement state. |
+| `Side side() const` | Return the remembered dock edge. |
+| `Fl_Widget& content() const` | Borrow the owned content widget, including from a const panel. |
+| `void resize(int x, int y, int w, int h) override` | Resize the frame and its content. |
+| `int handle(int event) override` | Dispatch title drag, double-click and context-menu interaction. |
+| `void draw() override` (protected) | Paint the panel frame and title. |
+
+Drag a panel title or dock tab toward the host's arrow guides. The center guide
+creates a tab group. Releasing away from a guide floats the panel. The close
+control hides it; reopen with `host.open(panel)`. Double-click the inner title
+to toggle floating/docked placement. The native window caption moves a floating
+window normally.
+
+### Tabs
+
+Declared in [fltk_dock_tabs.h](../include/fltk_dock_tabs.h).
+`Tabs` derives from `Fl_Tabs` and retains native selection, keyboard navigation,
+child ownership and overflow behavior.
+
+| Declaration | Result |
+| --- | --- |
+| `Tabs(int x, int y, int w, int h, const char* label = nullptr)` | Create rectangular document or docking tabs. |
+| `void resize(int x, int y, int w, int h) override` | Keep a 30-pixel strip and fit constructed pages to the client area. |
+| `int handle(int event) override` | Permit docking-panel tab drags; ordinary pages use native FLTK handling. |
+| `void draw_tab(int, int, int, int, Fl_Widget*, int, int) override` (protected) | Paint a tab and its optional close glyph. |
+| `int hit_close(Fl_Widget*, int, int) override` (protected) | Test the same close-glyph geometry used for drawing. |
+| `int tab_positions() override` (protected) | Calculate tab placement for the custom strip. |
+
+For an ordinary page, enable a close request with
+`page->when(FL_WHEN_CLOSED)` and `page->callback(...)`. The callback decides
+whether to save, cancel or remove the page; the library does not make that
+decision for the application.
+
 ## Standalone document tabs
 
 Inside an open window group, create pages as ordinary FLTK children:
@@ -168,6 +152,47 @@ new Fl_Box(20, 50, 250, 80, "Second document");
 second->end();
 tabs->end();
 tabs->value(first);
+```
+
+## Supporting data types
+
+These public value and configuration types supply inputs and results for the
+operations above. Their fields and defaults are listed here for reference.
+
+### Side and PanelState
+
+Declared in [fltk_dock.h](../include/fltk_dock.h).
+
+`enum class Side { Left, Right, Top, Bottom };` identifies an edge.
+`PanelState` is an application-owned value with these public fields:
+
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `std::string id` | empty | Stable registered panel ID. |
+| `Side side` | `Side::Left` | Dock edge, also remembered when floating. |
+| `int extent` | `240` | Width of a left/right strip or height of a top/bottom strip. |
+| `bool open` | `true` | Whether the panel is open. |
+| `bool floating` | `false` | Whether it occupies a floating window. |
+| `int x`, `int y` | `100`, `100` | Floating window screen coordinates. |
+| `int w`, `int h` | `400`, `400` | Floating window dimensions. |
+| `std::string tab_group` | empty | Shared docking tab group identifier, if any. |
+| `bool active` | `false` | Active panel within a tab group. |
+
+Keep the vector order returned by `save_layout()`: it also records strip
+placement order. Store all fields when serializing a snapshot.
+
+## Headers and linking
+
+`<fltk_dock.h>` declares the host, panels and snapshots, and includes
+`<fltk_dock_tabs.h>`. Include the latter directly for standalone document tabs.
+
+```cmake
+cmake_minimum_required(VERSION 3.21)
+project(dock-example LANGUAGES CXX)
+find_package(fltk-dock 0.1 CONFIG REQUIRED)
+add_executable(example main.cpp)
+target_compile_features(example PRIVATE cxx_std_17)
+target_link_libraries(example PRIVATE fltk-dock::fltk-dock)
 ```
 
 ## Scope and build options
